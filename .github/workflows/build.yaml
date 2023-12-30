@@ -1,0 +1,53 @@
+name: Diff Anything
+
+on:
+  push:
+    branches:
+    - "**"
+  pull_request:
+    branches:
+    - "**"
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+
+    steps:
+
+      - name: Check out
+        uses: actions/checkout@v3
+
+      - name: Build and test done folder
+        run: |
+          dotnet restore
+          dotnet build
+          dotnet test --logger "junit;LogFilePath=../test-results/test-results.xml" --collect:"XPlat Code Coverage;Format=opencover" --results-directory="test-results"
+          ls -lR test-results
+
+      - name: Test Report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: test-results
+          path: "test-results/*.xml"
+          reporter: java-junit
+
+      - name: Coverage processor
+        uses: im-open/code-coverage-report-generator@4
+        if: always()
+        with:
+          reports: 'test-results/**/coverage.opencover.xml'
+          targetdir: './test-results'
+          title: dotnet code coverage
+          reporttypes: 'MarkdownSummary;'
+          assemblyfilters: '-xunit*;-Dapper;-MyProj.Tests.Shared;'
+
+      - name: Coverage to run summary
+        if: always()
+        run: cat test-results/Summary.md >> $GITHUB_STEP_SUMMARY
